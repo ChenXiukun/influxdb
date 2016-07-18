@@ -5,7 +5,10 @@ package tsm1
 // how many booleans are packed in the slice.  The remaining bytes contains 1 byte for every
 // 8 boolean values encoded.
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 const (
 	// booleanUncompressed is an uncompressed boolean format.
@@ -97,10 +100,19 @@ type BooleanDecoder struct {
 // SetBytes initializes the decoder with a new set of bytes to read from.
 // This must be called before calling any other methods.
 func (e *BooleanDecoder) SetBytes(b []byte) {
+	if len(b) == 0 {
+		e.err = fmt.Errorf("BooleanDecoder: initialized with empty data")
+		return
+	}
+
 	// First byte stores the encoding type, only have 1 bit-packet format
 	// currently ignore for now.
 	b = b[1:]
 	count, n := binary.Uvarint(b)
+	if n <= 0 {
+		e.err = fmt.Errorf("BooleanDecoder: invalid count")
+		return
+	}
 
 	e.b = b[n:]
 	e.i = -1
@@ -108,8 +120,12 @@ func (e *BooleanDecoder) SetBytes(b []byte) {
 }
 
 func (e *BooleanDecoder) Next() bool {
+	if e.err != nil {
+		return false
+	}
+
 	e.i++
-	return e.i < e.n
+	return e.i/8 < len(e.b) && e.i < e.n
 }
 
 func (e *BooleanDecoder) Read() bool {
